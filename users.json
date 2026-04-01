@@ -1,0 +1,30 @@
+[
+  {
+    "id": 1,
+    "username": "admin@holasuite.com",
+    "password": "hola2025",
+    "role": "admin",
+    "name": "Administrador"
+  },
+  {
+    "id": 3,
+    "username": "alejandro",
+    "password": "alejandro123",
+    "role": "consultant",
+    "name": "Alejandro Zambrano"
+  },
+  {
+    "id": 4,
+    "username": "mariane",
+    "password": "mariane123",
+    "role": "consultant",
+    "name": "Mariane Teló"
+  },
+  {
+    "id": 1774642292987,
+    "username": "edwin@holasuite.com",
+    "password": "Lore2175.",
+    "role": "admin",
+    "name": "Edwin Franco"
+  }
+]

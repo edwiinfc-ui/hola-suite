@@ -1,0 +1,7 @@
+✅ Servidor corriendo en http://localhost:3000
+🔑 ClickUp List: 9002104190
+💾 Cache TTL: 3600s
+Error sincronizando consultores: SyntaxError: Unexpected non-whitespace character after JSON at position 154
+    at JSON.parse (<anonymous>)
+    at /home/ixcsoft/Dashboard- Hola suite/server.js:1278:31
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
