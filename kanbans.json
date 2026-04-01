@@ -1,0 +1,20 @@
+{
+  "kanbans": [
+    {
+      "id": "kb_default",
+      "name": "ClickUp Sincronizado",
+      "type": "clickup",
+      "ownerId": null,
+      "createdAt": "2026-03-30T00:00:00Z",
+      "updatedAt": "2026-03-30T00:00:00Z",
+      "config": {
+        "listId": "9002104190",
+        "apiKey": "pk_9905747_YA8JWPKAC2GPO5MRWL74KLTCU5918QQG"
+      },
+      "sharedWith": [],
+      "permissions": "public"
+    }
+  ],
+  "userKanbans": [],
+  "comments": []
+}
