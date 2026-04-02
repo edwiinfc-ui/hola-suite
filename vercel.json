@@ -35,6 +35,18 @@
   ],
   "headers": [
     {
+      "source": "/vylex.html",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-store" }
+      ]
+    },
+    {
+      "source": "/(.*)\\.html",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-store" }
+      ]
+    },
+    {
       "source": "/api/(.*)",
       "headers": [
         {
