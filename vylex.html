@@ -2577,6 +2577,15 @@ async function postJson(url, body){
   return json;
 }
 
+async function getJson(url){
+  const headers={};
+  if(APP?.token)headers.Authorization=`Bearer ${APP.token}`;
+  const resp=await fetch(url,{headers});
+  const json=await resp.json().catch(()=>({}));
+  if(!resp.ok)throw new Error(json?.error||`HTTP ${resp.status}`);
+  return json;
+}
+
 function normalizeHolaConversation(raw){
   const opaRoute=raw.id_rota||raw.rota||raw.route||null;
   const opaAttendees=Array.isArray(opaRoute?.atendentes)?opaRoute.atendentes:[];
@@ -3728,11 +3737,18 @@ async function syncClickUp(){
     const primarySource=getActiveSource();
     if(primarySource==='custom_json'){importManualDataset(true);return;}
     if(primarySource!=='clickup')throw new Error(t('toast.source_requires_adapter',`La fuente "${primarySource}" requiere importación JSON o un adaptador API personalizado`).replace('{source}',primarySource));
-    const apiKey=(document.getElementById('cfgApiKey')?.value||CONFIG.API_KEY||'').trim();
     const listId=(document.getElementById('cfgListId')?.value||CONFIG.LIST_ID||'').trim();
-    if(!apiKey||!listId)throw new Error(t('toast.configure_clickup','Configura API Key y List ID de ClickUp para usar datos reales'));
+    if(!listId)throw new Error(t('toast.configure_clickup','Configura List ID de ClickUp para usar datos reales'));
     updateLoadingMsg(t('toast.downloading_clickup_tasks','Descargando tareas de ClickUp...'));
-    const tasks=await fetchAllTasks(apiKey,listId);
+    let tasks=[];
+    if(canUseServerProxy() && APP?.token){
+      const json=await getJson('/api/clickup/tasks');
+      tasks=Array.isArray(json.tasks)?json.tasks:[];
+    }else{
+      const apiKey=(document.getElementById('cfgApiKey')?.value||CONFIG.API_KEY||'').trim();
+      if(!apiKey)throw new Error(t('toast.configure_clickup','Configura API Key y List ID de ClickUp para usar datos reales'));
+      tasks=await fetchAllTasks(apiKey,listId);
+    }
     if(tasks&&tasks.length>0){
       updateLoadingMsg(`${t('toast.processing','Procesando')} ${tasks.length} ${t('toast.tasks','tareas')}...`);
       APP.lastRawTasks=tasks;
@@ -8416,6 +8432,7 @@ function showLoading(show,msg){
   if(el)el.classList.toggle('hidden',!show);
   if(msg)updateLoadingMsg(msg);
 }
+function hideLoading(){ showLoading(false); }
 function updateLoadingMsg(msg){const el=document.getElementById('loadingMsg');if(el)el.textContent=msg;}
 function toast(type,msg,duration=4000){
   const c=document.getElementById('toastContainer');
@@ -9945,7 +9962,7 @@ function bulkAddNote(){
     }
   });
   
-  localStorage.setItem('holaData',JSON.stringify({data:APP.data,ts:Date.now(),meta:APP.apiMeta}));
+  safeLocalStorageSet('holaData',JSON.stringify({data:APP.data,ts:Date.now(),meta:APP.apiMeta}));
   renderAll(APP.filteredByDate);
   toast('success',`✅ Nota agregada a ${selected.length} cliente(s)`);
 }
@@ -9961,7 +9978,7 @@ function bulkAssignConsultant(){
     if(c)c.rCap=responsable;
   });
   
-  localStorage.setItem('holaData',JSON.stringify({data:APP.data,ts:Date.now(),meta:APP.apiMeta}));
+  safeLocalStorageSet('holaData',JSON.stringify({data:APP.data,ts:Date.now(),meta:APP.apiMeta}));
   renderAll(APP.filteredByDate);
   toast('success',`✅ Responsable asignado a ${selected.length} cliente(s)`);
 }

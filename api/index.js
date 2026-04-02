@@ -36,6 +36,38 @@ function verificarAuth(req) {
   }
 }
 
+async function getClickUpTasks(req, res) {
+  try {
+    const auth = verificarAuth(req);
+    if (!auth) return res.status(401).json({ error: 'No autorizado' });
+
+    const apiKey = (process.env.CLICKUP_API_KEY || '').trim();
+    const listId = (process.env.CLICKUP_LIST_ID || '').trim();
+    if (!apiKey || !listId) {
+      return res.status(503).json({ error: 'Faltan CLICKUP_API_KEY / CLICKUP_LIST_ID en Vercel' });
+    }
+
+    const tasks = [];
+    for (let page = 0; page < 25; page++) {
+      const url = `https://api.clickup.com/api/v2/list/${encodeURIComponent(listId)}/task?page=${page}&include_closed=true&archived=false&subtasks=true`;
+      const resp = await fetch(url, { headers: { Authorization: apiKey, 'Content-Type': 'application/json' } });
+      if (!resp.ok) {
+        const txt = await resp.text().catch(() => '');
+        return res.status(resp.status).json({ error: `ClickUp HTTP ${resp.status}: ${txt.slice(0, 200)}` });
+      }
+      const json = await resp.json().catch(() => ({}));
+      const chunk = Array.isArray(json.tasks) ? json.tasks : [];
+      if (!chunk.length) break;
+      tasks.push(...chunk);
+      if (chunk.length < 100) break;
+    }
+
+    res.status(200).json({ tasks, listId });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+}
+
 /**
  * GET /api/auth/me - Obtener usuario actual (JWT)
  */
@@ -268,6 +300,10 @@ module.exports = async (req, res) => {
     }
     if (path[0] === 'auth' && path[1] === 'me' && method === 'GET') {
       return me(req, res);
+    }
+
+    if (path[0] === 'clickup' && path[1] === 'tasks' && method === 'GET') {
+      return getClickUpTasks(req, res);
     }
     
     if (path[0] === 'data') {
