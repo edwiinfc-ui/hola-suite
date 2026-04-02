@@ -3,16 +3,24 @@
  * Todos los endpoints de la aplicación
  */
 
-const { createClient } = require('@supabase/supabase-js');
 const jwt = require('jsonwebtoken');
 
 require('dotenv').config();
 
-// Inicializar Supabase
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY
-);
+let supabase = null;
+function getSupabase() {
+  if (supabase) return supabase;
+  const url = (process.env.SUPABASE_URL || '').trim();
+  const serviceKey = (process.env.SUPABASE_SERVICE_KEY || '').trim();
+  if (!url || !serviceKey) {
+    const err = new Error('Faltan variables de entorno SUPABASE_URL / SUPABASE_SERVICE_KEY en Vercel');
+    err.statusCode = 503;
+    throw err;
+  }
+  const { createClient } = require('@supabase/supabase-js');
+  supabase = createClient(url, serviceKey);
+  return supabase;
+}
 
 /**
  * Middleware para verificar JWT
@@ -42,6 +50,7 @@ async function me(req, res) {
  */
 async function getClientes(req, res) {
   try {
+    const supabase = getSupabase();
     const { data, error } = await supabase
       .from('clientes')
       .select('*')
@@ -60,6 +69,9 @@ async function getClientes(req, res) {
 async function login(req, res) {
   try {
     const { email, password } = req.body;
+    if (!process.env.JWT_SECRET) {
+      return res.status(503).json({ error: 'Falta configurar JWT_SECRET en Vercel' });
+    }
     
     // Verificación simple (en producción usar Supabase Auth)
     if (email === 'admin@holasuite.com' && password === 'hola2025') {
@@ -89,6 +101,7 @@ async function crearCliente(req, res) {
     const auth = verificarAuth(req);
     if (!auth) return res.status(401).json({ error: 'No autorizado' });
     
+    const supabase = getSupabase();
     const { data, error } = await supabase
       .from('clientes')
       .insert([req.body])
@@ -110,6 +123,7 @@ async function actualizarCliente(req, res) {
     if (!auth) return res.status(401).json({ error: 'No autorizado' });
     
     const id = req.query.id;
+    const supabase = getSupabase();
     const { data, error } = await supabase
       .from('clientes')
       .update(req.body)
@@ -132,6 +146,7 @@ async function eliminarCliente(req, res) {
     if (!auth) return res.status(401).json({ error: 'No autorizado' });
     
     const id = req.query.id;
+    const supabase = getSupabase();
     const { error } = await supabase
       .from('clientes')
       .delete()
@@ -149,6 +164,7 @@ async function eliminarCliente(req, res) {
  */
 async function getSalesGoals(req, res) {
   try {
+    const supabase = getSupabase();
     const { data, error } = await supabase
       .from('sales_goals')
       .select('*')
@@ -170,6 +186,7 @@ async function crearOActualizarGoal(req, res) {
     if (!auth) return res.status(401).json({ error: 'No autorizado' });
     
     const { vendedor, mes, meta_clientes, meta_valor } = req.body;
+    const supabase = getSupabase();
     
     // Intentar actualizar primero
     const { data: existente } = await supabase
@@ -209,6 +226,7 @@ async function getAuditLogs(req, res) {
     const auth = verificarAuth(req);
     if (!auth) return res.status(401).json({ error: 'No autorizado' });
     
+    const supabase = getSupabase();
     const { data, error } = await supabase
       .from('audit_logs')
       .select('*')
