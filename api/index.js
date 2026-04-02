@@ -29,6 +29,15 @@ function verificarAuth(req) {
 }
 
 /**
+ * GET /api/auth/me - Obtener usuario actual (JWT)
+ */
+async function me(req, res) {
+  const auth = verificarAuth(req);
+  if (!auth) return res.status(401).json({ error: 'No autorizado' });
+  res.status(200).json({ user: auth });
+}
+
+/**
  * GET /api/data - Obtener todos los clientes
  */
 async function getClientes(req, res) {
@@ -233,6 +242,14 @@ module.exports = async (req, res) => {
     // Rutas
     if (path[0] === 'login' && method === 'POST') {
       return login(req, res);
+    }
+
+    // Alias para compatibilidad con server.js / frontend
+    if (path[0] === 'auth' && path[1] === 'login' && method === 'POST') {
+      return login(req, res);
+    }
+    if (path[0] === 'auth' && path[1] === 'me' && method === 'GET') {
+      return me(req, res);
     }
     
     if (path[0] === 'data') {

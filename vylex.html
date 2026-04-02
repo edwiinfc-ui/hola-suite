@@ -2931,6 +2931,76 @@ function initializeWithShareToken() {
 }
 
 // Login mejorado con servidor
+const SESSION_KEYS = {
+  token: 'hola_suite_token',
+  user: 'hola_suite_user',
+  ts: 'hola_suite_timestamp'
+};
+
+function saveSession(token, user){
+  try{
+    localStorage.setItem(SESSION_KEYS.token, token);
+    localStorage.setItem(SESSION_KEYS.user, JSON.stringify(user||{}));
+    localStorage.setItem(SESSION_KEYS.ts, String(Date.now()));
+    return true;
+  }catch(_e){
+    return false;
+  }
+}
+
+function clearSession(){
+  try{ localStorage.removeItem(SESSION_KEYS.token); }catch{}
+  try{ localStorage.removeItem(SESSION_KEYS.user); }catch{}
+  try{ localStorage.removeItem(SESSION_KEYS.ts); }catch{}
+}
+
+function readSession(){
+  try{
+    const token=localStorage.getItem(SESSION_KEYS.token);
+    const userStr=localStorage.getItem(SESSION_KEYS.user);
+    if(!token||!userStr)return null;
+    const user=JSON.parse(userStr||'{}');
+    return { token, user };
+  }catch(_e){
+    return null;
+  }
+}
+
+async function restoreSessionIfValid(){
+  const session=readSession();
+  if(!session)return false;
+  try{
+    // Validar token con el servidor (si expiró, /api/auth/me falla)
+    const resp=await fetch('/api/auth/me',{headers:{Authorization:`Bearer ${session.token}`}});
+    if(!resp.ok)throw new Error('invalid');
+    const json=await resp.json().catch(()=>({}));
+    const user=json.user||session.user;
+
+    APP.token=session.token;
+    APP.currentUser=user;
+    setUserUI(user);
+
+    const scr=document.getElementById('loginScreen');
+    if(scr){
+      scr.style.transition='opacity .3s';
+      scr.style.opacity='0';
+      setTimeout(()=>{
+        scr.classList.add('hidden');
+        document.getElementById('mainApp')?.classList.remove('hidden');
+      },300);
+    }
+
+    loadSavedData();
+    await loadCustomKanbans().catch(()=>{});
+    await syncClickUp().catch(()=>{});
+    connectToServerEvents();
+    return true;
+  }catch(_e){
+    clearSession();
+    return false;
+  }
+}
+
 async function doLogin(){
   const email=document.getElementById('loginEmail')?.value?.trim();
   const pass=document.getElementById('loginPassword')?.value;
@@ -2942,20 +3012,32 @@ async function doLogin(){
   
   try {
     showLoading(true, 'Conectando...');
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 20000);
     
     // Llamar al endpoint de login del servidor
     const loginRes = await fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
       body: JSON.stringify({ 
         username: email, 
         password: pass 
       })
     });
+    clearTimeout(timeoutId);
 
     if(!loginRes.ok) {
-      const data = await loginRes.json();
-      throw new Error(data.error || 'Credenciales incorrectas');
+      const data = await loginRes.json().catch(()=>({}));
+      const msg = String(data?.error || '').trim();
+      if (loginRes.status === 401) {
+        throw new Error(msg || 'Usuario o contraseña incorrectos');
+      }
+      if (loginRes.status === 503) {
+        throw new Error(msg || 'Servidor no disponible / configuración incompleta');
+      }
+      throw new Error(msg || `Error de login (HTTP ${loginRes.status})`);
     }
     
     const data = await loginRes.json();
@@ -2965,6 +3047,7 @@ async function doLogin(){
     APP.token = token;
     APP.currentUser = user;
     CONFIG.LIST_ID = clickup?.listId || CONFIG.LIST_ID || '';
+    saveSession(token, user);
     
     // Transición al dashboard
     const scr=document.getElementById('loginScreen');
@@ -2997,6 +3080,10 @@ async function doLogin(){
     
   } catch(error) {
     hideLoading();
+    if (error?.name === 'AbortError') {
+      showError('Tiempo de espera agotado. Revisa tu conexión o el servidor.');
+      return;
+    }
     showError(error.message || 'Error al conectar');
   }
 }
@@ -3032,14 +3119,17 @@ async function fetchUsersFromServer() {
 function doLogout(){
   disconnectFromServerEvents();
   APP.currentUser=null;
+  APP.token=null;
+  clearSession();
   document.getElementById('mainApp').classList.add('hidden');
   const scr=document.getElementById('loginScreen');
   scr.classList.remove('hidden');scr.style.opacity='1';
 }
 function setUserUI(u){
-  document.getElementById('userAvatar').textContent=u.avatar;
-  document.getElementById('userAvatarTop').textContent=u.avatar;
-  document.getElementById('userNameDisplay').textContent=u.name;
+  const avatar=(u?.avatar||u?.name||u?.username||'U').toString().trim().charAt(0).toUpperCase();
+  document.getElementById('userAvatar').textContent=avatar;
+  document.getElementById('userAvatarTop').textContent=avatar;
+  document.getElementById('userNameDisplay').textContent=u?.name||u?.username||'Usuario';
   document.getElementById('userRoleDisplay').textContent={admin:'Administrador',consultant:'Consultor',cs:'CS Team',viewer:'Visualizador'}[u.role]||u.role;
 }
 
@@ -3117,7 +3207,19 @@ function disconnectFromServerEvents() {
 // Verificar si hay share token al cargar
 window.addEventListener('DOMContentLoaded', () => {
   if (!initializeWithShareToken()) {
-    // Sin share token, mostrar login normal
+    restoreSessionIfValid();
+  }
+});
+
+// Mantener sesión entre pestañas (login/logout)
+window.addEventListener('storage', (e) => {
+  if(e.key !== SESSION_KEYS.token) return;
+  if(e.newValue === null){
+    if(APP?.token) doLogout();
+    return;
+  }
+  if(e.newValue && e.newValue !== APP?.token){
+    restoreSessionIfValid();
   }
 });
 
